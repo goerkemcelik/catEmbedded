@@ -1,0 +1,23 @@
+# ---- ESP-IDF / Espressif Build Files ----
+build/
+sdkconfig.old
+sdkconfig.defaults
+sdkconfig.ci
+*.bin
+*.elf
+*.map
+*.log
+
+# ---- VS Code Files ----
+.vscode/
+.vscode-test/
+
+# ---- OS / Editor Cache ----
+.DS_Store
+Thumbs.db
+
+# ---- Python virtual env (falls vorhanden) ----
+venv/
+.env/
+__pycache__/
+*.pyc
