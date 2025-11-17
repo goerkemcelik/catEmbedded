@@ -51,7 +51,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     },
 
     {
-        /* Service: Device Information (optional, aus Template beibehalten) */
+        /* Service: Device Information */
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = BLE_UUID16_DECLARE(GATT_DEVICE_INFO_UUID),
         .characteristics = (struct ble_gatt_chr_def[]) {
@@ -74,7 +74,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     { 0 }, /* end of services */
 };
 
-/* Globaler Wert (von main.c gesetzt), der den letzten ADC-Messwert hält */
+/* Letzter gelesener Potentiometerwert in mV */
 uint16_t latest_voltage_mv = 0;
 
 /* Access Callback: Potentiometer-Wert */
