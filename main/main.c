@@ -18,7 +18,7 @@
 #define POT_CHANNEL ADC1_CHANNEL_2
 #define ADC_ATTEN ADC_ATTEN_DB_12
 #define ADC_WIDTH ADC_WIDTH_BIT_12
-#define SAMPLES 10
+#define SAMPLES 100
 
 static uint8_t own_addr_type;
 
@@ -108,7 +108,7 @@ void app_main(void) {
         uint16_t voltageMean = esp_adc_cal_raw_to_voltage(mean, &adc_chars);
 
         printf("{P0|Mean|%u mV}\n", voltageMean);
-        blehr_sens_send(voltageMean);
+        ble_pot_send(voltageMean);
 
         vTaskDelay(pdMS_TO_TICKS(500));
     }

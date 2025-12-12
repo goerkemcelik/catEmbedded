@@ -14,7 +14,7 @@
 static const char *TAG = "gatt_svr";
 
 static const char *manuf_name = "ESP32-C3";
-static const char *model_num = "ADC BLE Sensor";
+static const char *model_num = "C.A.T.";
 
 /* Handle für die Potentiometer-Characteristic */
 uint16_t pot_value_handle;
@@ -35,9 +35,9 @@ static int gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_h
  */
 static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     {
-        /* Service: Potentiometer Measurement */
+        /* Service: Tilt Controller */
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
-        .uuid = BLE_UUID16_DECLARE(GATT_SVR_SVC_POTENTIOMETER_UUID),
+        .uuid = BLE_UUID16_DECLARE(GATT_SVR_SVC_TILTCONTROLLER_UUID),
         .characteristics = (struct ble_gatt_chr_def[]) {
             {
                 /* Characteristic: Potentiometer Voltage (in mV) */
@@ -81,11 +81,13 @@ uint16_t latest_voltage_mv = 0;
 static int gatt_svr_chr_access_potentiometer(uint16_t conn_handle, uint16_t attr_handle,
                                             struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    char buf[8];
-    int len = snprintf(buf, sizeof(buf), "%u mV", latest_voltage_mv);
+    /* Send as big-endian uint16_t (2 bytes) */
+    uint8_t buf[2];
+    buf[0] = (latest_voltage_mv >> 8) & 0xFF;  /* MSB */
+    buf[1] = latest_voltage_mv & 0xFF;         /* LSB */
 
-    int rc = os_mbuf_append(ctxt->om, buf, len);
-    ESP_LOGI(TAG, "GATT read request: %u mV", latest_voltage_mv);
+    int rc = os_mbuf_append(ctxt->om, buf, 2);
+    ESP_LOGI(TAG, "GATT read request: %u mV [0x%02X, 0x%02X]", latest_voltage_mv, buf[0], buf[1]);
     return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
@@ -113,7 +115,7 @@ gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
 }
 
-/* Registrierungscallback für Debug (wie im Template) */
+/* Registrierungscallback für Debug */
 void
 gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
 {
@@ -152,7 +154,7 @@ gatt_svr_init(void)
 {
     int rc;
 
-    /* Init Standard GAP und GATT Services (aus Template) */
+    /* Init Standard GAP und GATT Services */
     ble_svc_gap_init();
     ble_svc_gatt_init();
 
@@ -169,17 +171,19 @@ gatt_svr_init(void)
     return 0;
 }
 
-void blehr_sens_send(uint16_t value_mv)
+void ble_pot_send(uint16_t value_mv)
 {
     latest_voltage_mv = value_mv;
 
     if (pot_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
-        char buf[8];
-        int len = snprintf(buf, sizeof(buf), " %u mV", value_mv);
-        struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
+        /* Send as big-endian uint16_t (2 bytes) */
+        uint8_t buf[2];
+        buf[0] = (value_mv >> 8) & 0xFF;  /* MSB */
+        buf[1] = value_mv & 0xFF;         /* LSB */
+        struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, 2);
         int rc = ble_gattc_notify_custom(pot_conn_handle, pot_value_handle, om);
         if (rc == 0) {
-            ESP_LOGI(TAG, "Notified %u mV to BLE client", value_mv);
+            ESP_LOGI(TAG, "Notified %u mV [0x%02X, 0x%02X] to BLE client", value_mv, buf[0], buf[1]);
         } else {
             ESP_LOGW(TAG, "Notify failed: rc=%d", rc);
         }
