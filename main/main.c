@@ -15,7 +15,7 @@
 #include "ble_sens.h"
 
 #define TAG "MAIN"
-#define POT_CHANNEL ADC1_CHANNEL_2
+#define ADC_CHANNEL ADC1_CHANNEL_2
 #define ADC_ATTEN ADC_ATTEN_DB_12
 #define ADC_WIDTH ADC_WIDTH_BIT_12
 #define SAMPLES 100
@@ -27,7 +27,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
             ESP_LOGI(TAG, "BLE connected");
-            pot_conn_handle = event->connect.conn_handle;
+            adc_conn_handle = event->connect.conn_handle;
         } else {
             ESP_LOGI(TAG, "BLE connect failed; retrying");
             ble_gap_adv_start(own_addr_type, NULL, BLE_HS_FOREVER,
@@ -39,7 +39,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
 
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "BLE disconnected; restarting advertise");
-        pot_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        adc_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         ble_gap_adv_start(own_addr_type, NULL, BLE_HS_FOREVER,
                           &(struct ble_gap_adv_params){.conn_mode = BLE_GAP_CONN_MODE_UND,
                                                        .disc_mode = BLE_GAP_DISC_MODE_GEN},
@@ -92,24 +92,23 @@ void app_main(void) {
 
     nimble_port_freertos_init(nimble_host_task);
 
-    adc1_config_width(ADC_WIDTH);
-    adc1_config_channel_atten(POT_CHANNEL, ADC_ATTEN);
-
+    // 12 bit Auflösung (0 - 4095) bei 0 - 3.3V
+    adc1_config_width(ADC_WIDTH);   
+    adc1_config_channel_atten(ADC_CHANNEL, ADC_ATTEN);
+    // Charakterisierung des ADC
     esp_adc_cal_characteristics_t adc_chars;
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN, ADC_WIDTH, 1100, &adc_chars);
-
+    // Endlosschleife zum Auslesen des jeweiligen ADC-Channels
     while (1) {
         uint32_t sum = 0;
         for (int i = 0; i < SAMPLES; i++) {
-            sum += adc1_get_raw(POT_CHANNEL);
+            sum += adc1_get_raw(ADC_CHANNEL);
             vTaskDelay(pdMS_TO_TICKS(10));
         }
-        int mean = sum / SAMPLES;
+        int mean = sum / SAMPLES;   // Mittelwertbildung über 25 Samples
         uint16_t voltageMean = esp_adc_cal_raw_to_voltage(mean, &adc_chars);
-
         printf("{P0|Mean|%u mV}\n", voltageMean);
-        ble_pot_send(voltageMean);
-
+        ble_adc_send(voltageMean);
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }

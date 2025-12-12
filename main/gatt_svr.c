@@ -17,13 +17,13 @@ static const char *manuf_name = "ESP32-C3";
 static const char *model_num = "C.A.T.";
 
 /* Handle für die Potentiometer-Characteristic */
-uint16_t pot_value_handle;
+uint16_t adc_value_handle;
 
 /* Handle der aktiven Verbindung */
-uint16_t pot_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+uint16_t adc_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 
 /* Vorwärtsdeklarationen der Access Callbacks */
-static int gatt_svr_chr_access_potentiometer(uint16_t conn_handle, uint16_t attr_handle,
+static int gatt_svr_chr_access_adc(uint16_t conn_handle, uint16_t attr_handle,
                                              struct ble_gatt_access_ctxt *ctxt, void *arg);
 static int gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_handle,
                                            struct ble_gatt_access_ctxt *ctxt, void *arg);
@@ -34,16 +34,14 @@ static int gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_h
  *  - Device Information Service
  */
 static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
-    {
-        /* Service: Tilt Controller */
+    {   // Service: ADC
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
-        .uuid = BLE_UUID16_DECLARE(GATT_SVR_SVC_TILTCONTROLLER_UUID),
+        .uuid = BLE_UUID16_DECLARE(GATT_SVR_SVC_ADC_UUID),
         .characteristics = (struct ble_gatt_chr_def[]) {
-            {
-                /* Characteristic: Potentiometer Voltage (in mV) */
-                .uuid = BLE_UUID16_DECLARE(GATT_SVR_CHR_POT_VALUE_UUID),
-                .access_cb = gatt_svr_chr_access_potentiometer,
-                .val_handle = &pot_value_handle,
+            {   // Characteristic: ADC Voltage (in mV)
+                .uuid = BLE_UUID16_DECLARE(GATT_SVR_CHR_ADC_VALUE_UUID),
+                .access_cb = gatt_svr_chr_access_adc,
+                .val_handle = &adc_value_handle,
                 .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
             },
             { 0 }, /* end of characteristics */
@@ -78,7 +76,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
 uint16_t latest_voltage_mv = 0;
 
 /* Access Callback: Potentiometer-Wert */
-static int gatt_svr_chr_access_potentiometer(uint16_t conn_handle, uint16_t attr_handle,
+static int gatt_svr_chr_access_adc(uint16_t conn_handle, uint16_t attr_handle,
                                             struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     /* Send as big-endian uint16_t (2 bytes) */
@@ -171,17 +169,16 @@ gatt_svr_init(void)
     return 0;
 }
 
-void ble_pot_send(uint16_t value_mv)
-{
+void ble_adc_send(uint16_t value_mv) {
     latest_voltage_mv = value_mv;
-
-    if (pot_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
-        /* Send as big-endian uint16_t (2 bytes) */
+    if (adc_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        // Senden der Notification als Big-Endian uint16_t (2 Bytes)
         uint8_t buf[2];
-        buf[0] = (value_mv >> 8) & 0xFF;  /* MSB */
-        buf[1] = value_mv & 0xFF;         /* LSB */
+        buf[0] = (value_mv >> 8) & 0xFF;  // MSB
+        buf[1] = value_mv & 0xFF;         // LSB 
         struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, 2);
-        int rc = ble_gattc_notify_custom(pot_conn_handle, pot_value_handle, om);
+        int rc = ble_gattc_notify_custom(adc_conn_handle, adc_value_handle, om);
+        // ... Debug-Ausgabe ... //
         if (rc == 0) {
             ESP_LOGI(TAG, "Notified %u mV [0x%02X, 0x%02X] to BLE client", value_mv, buf[0], buf[1]);
         } else {
